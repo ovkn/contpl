@@ -1,0 +1,6 @@
+# pypi dist dir
+dist
+# distutils-generated file
+MANIFEST
+# examples
+examples/out_1/

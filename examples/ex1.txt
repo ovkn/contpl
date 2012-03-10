@@ -1,0 +1,2 @@
+# substituting server_name, listen and proxy directives in nginx config file (resides in tpl_1/nginx.conf)   
+contpl.py --tpl tpl_1 --out out_1 --server-name "example.com www.example.com" --listen "example.com" --proxy 127.0.0.0.1:5000

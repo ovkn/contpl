@@ -1,0 +1,17 @@
+Examples:
+
+$ contpl --tpl infile.tpl --out file.out --delim '$$$' --test 30
+Reads the infile.tpl template and rewrites its contents to infile.out,
+substituting "$$$test"
+
+$ contpl --tpl infile.tpl --out outdir --delim '%' --var1 20 --var2 hello
+Reads the infile.tpl template and rewrites its contents to outdir/infile.tpl,
+substituting "%var1" and "%var2"
+
+$ contpl --tpl indir --out outdir --var1 10 --var2 50
+Reads all the files from indir and rewrites them to outdir,
+substituting "$$$var1" and "$$$var2" ("$$$" is the default delimiter)
+
+$ contpl --tpl indir/\*.tpl --out outdir --var1 10 --var 20
+Reads all the files matching the mask (glob) "*.tpl" and rewrites them to 
+outdir, substituting "$$$var1" and "$$$var2"

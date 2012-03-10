@@ -1,0 +1,142 @@
+#!/usr/bin/env python
+
+u"""Command-line templates processor
+
+See README for details and usage examples
+"""
+
+import re
+import sys
+import glob
+import string
+import argparse
+import os.path
+
+
+def single_tpl(params):
+    u"""Prepares a single input template path and a single output path"""
+    if os.path.isdir(params.out):
+        out_file = os.path.join(params.out, os.path.basename(params.out))
+    elif (os.path.isfile(params.out) or
+            not os.path.exists(params.out)):
+        if params.out == params.tpl:
+            print_err("tpl (%s) and out (%s) are the same file" %
+                      (params.tpl, params.out))
+        out_file = params.out
+    else:
+        print_err("Unknown file type: %s" % params.out)
+    return [(params.tpl, out_file)]
+
+
+def is_glob(path):
+    u"""Checks if the path is a unix-glob"""
+    return any(char in {"*", "?", "[", "]"} for char in path)
+
+
+def multiple_tpls(params):
+    u"""Prepares several input template paths and several output paths"""
+    tpls = []
+
+    if is_glob(params.tpl):
+        glob_ptn = params.tpl
+    elif not os.path.exists(params.tpl):
+        print_err("Path not found: %s" % params.tpl)
+    elif os.path.isdir(params.tpl):
+        glob_ptn = params.tpl + "/*"
+    else:
+        print_err("Unknown file type: %s" % params.tpl)
+
+    if not os.path.exists(params.out):
+        print_err("Path not found: %s" % params.out)
+    elif not os.path.isdir(params.out):
+        print_err("%s is not a dir" % (params.out))
+
+    for tpl_path in glob.glob(glob_ptn):
+        if os.path.isfile(tpl_path):
+            tpls.append((tpl_path,
+                         os.path.join(params.out, os.path.basename(tpl_path))
+                         ))
+
+    if len(tpls) == 0:
+        print_err("no templates found in %s" % params.tpl)
+    return tpls
+
+
+def find_tpls(params):
+    u"""Scans filesystem for the templates specified"""
+    if os.path.isfile(params.tpl):
+        return single_tpl(params)
+    return multiple_tpls(params)
+
+
+def collect_args(tpls, delim):
+    u"""Scans all the templates and collects variables across them"""
+    tpl_args = set()
+    re_c = re.compile(re.escape(delim) + r"(\w+)")
+    for tpl_path in tpls:
+        with open(tpl_path, "r") as tpl_file:
+            content = tpl_file.read()
+            tpl_args.update(x.replace("_", "-")
+                            for x in
+                            set(re_c.findall(content)))
+    return tpl_args
+
+
+def base_parser():
+    u"""Creates a parser object with a minimal set of params"""
+    parser = argparse.ArgumentParser(description="Template interpreter")
+    parser.add_argument("--tpl", required=True,
+                        help="templates glob")
+    parser.add_argument("--out", required=True,
+                        help="output dir")
+    parser.add_argument("--delim", required=False,
+                        default="$$$",
+                        help="substitution delimiter")
+    return parser
+
+
+def print_err(err_str):
+    u"""Print error and exits"""
+    print err_str
+    exit(-1)
+
+
+def extend_parser(parser, tpl_args):
+    u"""Adds new arguments to the parser object"""
+    for tpl_arg in tpl_args:
+        parser.add_argument("--%s" % tpl_arg, required=True)
+    return parser
+
+
+def build_templator(params):
+    u"""Creates a string.Template child class for our delimiter"""
+    return type(string.Template)("DynamicTemplate",
+                                 (string.Template,),
+                                 dict(delimiter=params.delim))
+
+
+def rewrite_files(tpls, params, tpl_cls):
+    u"""Produces files based on the templates"""
+    for tpl_path, out_path in tpls:
+        with open(tpl_path, "r") as tpl_file:
+            tpl = tpl_cls(tpl_file.read())
+            with open(out_path, "w") as out_file:
+                out_file.write(tpl.substitute(vars(params)))
+            print "rewritten %s" % out_path
+
+
+def main():
+    u"""Scans templates for variables and substitutes variables with args"""
+    parser = base_parser()
+    params = parser.parse_known_args(sys.argv[1:])[0]
+    tpls = find_tpls(params)
+    tpl_args = collect_args([tpl[0] for tpl in tpls], params.delim)
+    extend_parser(parser, tpl_args)
+    params = parser.parse_args(sys.argv[1:])
+    tpl_cls = build_templator(params)
+    rewrite_files(tpls, params, tpl_cls)
+    print "done"
+
+
+if __name__ == "__main__":
+    main()
